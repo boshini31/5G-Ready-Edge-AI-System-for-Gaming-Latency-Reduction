@@ -1,5 +1,14 @@
-FROM python:3.14.3
+FROM python:3.11-slim
+
 WORKDIR /app
-COPY . .
-RUN pip install -r requirements.txt
-CMD ["python", "src/main.py"]
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ ./src
+COPY data/ ./data
+COPY models/ ./models
+
+EXPOSE 5000
+
+CMD ["python", "-m", "src.main"]

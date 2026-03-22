@@ -12,7 +12,8 @@ def run_server():
     @app.route("/predict", methods=["POST"])
     def predict():
         data = request.json["metrics"]
-        X = torch.tensor(data).float().unsqueeze(0)
+        X = torch.tensor(data).float()
+        
         prediction = model(X).item()
         return jsonify({"predicted_latency": prediction})
 

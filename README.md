@@ -311,20 +311,20 @@ The system auto-detects column names on upload. You can override manually via th
 ## 📸 Screenshots
 
 ### Live Dashboard
-![Dashboard](<img width="1882" height="892" alt="Image" src="https://github.com/user-attachments/assets/d9fcb2b1-2e71-4cc3-a18c-891a7e4ae8a0" >)
+![Dashboard](screenshots/Dashboard.png)
 
 ### APAC Region Heatmap
-![Heatmap](<img width="548" height="540" alt="Image" src="https://github.com/user-attachments/assets/f149e7a0-02cb-434f-8cef-722cedbfb602" />)
+![Heatmap](screenshots/Heatmap.png)
 
 ### Live Latency - Predicted vs Actual Latency
-![Retrain](<img width="1135" height="518" alt="Image" src="https://github.com/user-attachments/assets/56cf5506-ca92-4073-b156-9a71df5fe08c" />)
+![Retrain](screenshots/Live%20pre.png)
 
 ### Player Sessions & console Logs
-![Logs](<img width="1698" height="684" alt="Image" src="https://github.com/user-attachments/assets/74c41cea-43a9-4cdc-83ea-4720e847de35" />)
+![Logs](screenshots/playersession.png)
 
 ### Data & Model Train
-![Train](<img width="1769" height="746" alt="Image" src="https://github.com/user-attachments/assets/5c8d107e-019d-461b-916e-459c793b5126" />)
-![Loss Curve](<img width="1698" height="898" alt="Image" src="https://github.com/user-attachments/assets/2b31c920-87bf-4c7b-b32f-1a445a289fbc">)
+![Train](screenshots/datatrain.png)
+![LossCurve](screenshots/loss%20curve.png)
 
 
 ## 🎯 Impact & Skills Demonstrated

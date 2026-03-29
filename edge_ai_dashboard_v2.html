@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Edge AI — Gaming Latency Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #080c14;
+  --panel: #0d1420;
+  --panel2: #111827;
+  --border: #1e2d45;
+  --accent: #00e5ff;
+  --accent2: #ff4b6e;
+  --accent3: #a259ff;
+  --good: #00ffb3;
+  --warn: #ffcc00;
+  --danger: #ff4b6e;
+  --text: #e2eaf7;
+  --muted: #4a5f7a;
+  --fd: 'Syne', sans-serif;
+  --fm: 'Space Mono', monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--fd);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,0.012) 2px,rgba(0,229,255,0.012) 4px);pointer-events:none;z-index:0}
+.app{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:24px}
+
+/* ── Nav ── */
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:36px;height:36px;border:2px solid var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;animation:pulse-border 2.5s ease-in-out infinite}
+.logo-icon::after{content:'';width:10px;height:10px;background:var(--accent);border-radius:50%;animation:blink 1.2s ease-in-out infinite}
+@keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(0,229,255,.3)}50%{box-shadow:0 0 0 6px rgba(0,229,255,0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.logo-text{font-size:20px;font-weight:800;letter-spacing:-.5px}
+.logo-text span{color:var(--accent)}
+.logo-sub{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+
+.nav-tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:4px}
+.nav-tab{font-family:var(--fm);font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:8px 20px;border-radius:5px;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all .2s}
+.nav-tab.active{background:var(--accent);color:var(--bg);font-weight:700}
+.nav-tab:not(.active):hover{color:var(--text);background:var(--panel2)}
+
+.header-right{display:flex;align-items:center;gap:12px}
+.server-status{display:flex;align-items:center;gap:8px;font-family:var(--fm);font-size:11px;padding:6px 14px;border:1px solid var(--border);border-radius:4px;background:var(--panel)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .3s}
+.status-dot.online{background:var(--good);box-shadow:0 0 6px var(--good);animation:blink 2s infinite}
+.status-dot.error{background:var(--danger);box-shadow:0 0 6px var(--danger)}
+#status-text{color:var(--muted);transition:color .3s}
+
+.btn{font-family:var(--fm);font-size:11px;letter-spacing:1px;padding:8px 18px;border-radius:4px;cursor:pointer;border:none;text-transform:uppercase;transition:all .2s}
+.btn-primary{background:var(--accent);color:var(--bg);font-weight:700}
+.btn-primary:hover{opacity:.85;transform:translateY(-1px)}
+.btn-primary:disabled{background:var(--muted);cursor:not-allowed;transform:none}
+.btn-danger{background:transparent;border:1px solid var(--accent2);color:var(--accent2)}
+.btn-danger:hover{background:var(--accent2);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-success{background:var(--good);color:var(--bg);font-weight:700}
+.btn-success:hover{opacity:.85}
+
+/* ── Page sections ── */
+.page{display:none}.page.active{display:block}
+
+/* ── KPI row ── */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.kpi-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px 20px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-card.a1::before{background:var(--accent)}
+.kpi-card.a2::before{background:var(--accent2)}
+.kpi-card.a3::before{background:var(--accent3)}
+.kpi-card.a4::before{background:var(--good)}
+.kpi-label{font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.kpi-value{font-size:32px;font-weight:800;line-height:1;margin-bottom:4px}
+.kpi-value.a1{color:var(--accent)}.kpi-value.a2{color:var(--accent2)}.kpi-value.a3{color:var(--accent3)}.kpi-value.a4{color:var(--good)}
+.kpi-unit{font-family:var(--fm);font-size:11px;color:var(--muted)}
+.kpi-delta{font-family:var(--fm);font-size:10px;margin-top:6px}
+.kpi-delta.up{color:var(--danger)}.kpi-delta.down{color:var(--good)}
+
+/* ── Panels ── */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px}
+.panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.panel-title{font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text);display:flex;align-items:center;gap:8px}
+.panel-title .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite}
+
+.main-grid{display:grid;grid-template-columns:1fr 420px;gap:16px;margin-bottom:16px}
+.chart-wrap{position:relative;height:280px}
+
+/* ── APAC Map ── */
+svg.apac-map{width:100%;height:auto}
+.region-bubble{cursor:pointer;transition:all .3s}
+.region-bubble circle{transition:r .4s ease,fill .4s ease}
+
+/* ── Player table ── */
+.player-table{width:100%;border-collapse:collapse}
+.player-table th{font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;padding:0 0 10px;text-align:left;border-bottom:1px solid var(--border)}
+.player-table td{padding:10px 0;font-family:var(--fm);font-size:12px;border-bottom:1px solid rgba(30,45,69,.5);vertical-align:middle}
+.player-badge{display:inline-block;width:26px;height:26px;border-radius:6px;text-align:center;line-height:26px;font-size:10px;font-weight:700;background:var(--panel2);border:1px solid var(--border);margin-right:8px}
+.latency-bar-bg{width:80px;height:4px;background:var(--border);border-radius:2px}
+.latency-bar{height:4px;border-radius:2px;transition:width .5s ease}
+.tag{font-family:var(--fm);font-size:9px;padding:2px 6px;border-radius:3px;letter-spacing:1px}
+.tag.good{background:rgba(0,255,179,.12);color:var(--good)}
+.tag.warn{background:rgba(255,204,0,.12);color:var(--warn)}
+.tag.bad{background:rgba(255,75,110,.12);color:var(--danger)}
+
+/* ── Config ── */
+.config-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.config-row label{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1px}
+.config-row input[type=number],.config-row select,.field-input{background:var(--panel2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:4px}
+.config-row input[type=number]{width:70px}
+.config-row select{width:auto}
+
+/* ── Log ── */
+.log-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-top:16px}
+.log-scroll{height:100px;overflow-y:auto;font-family:var(--fm);font-size:10px;color:var(--muted)}
+.log-scroll::-webkit-scrollbar{width:4px}
+.log-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.log-line{padding:1.5px 0}
+.log-line .ts{color:var(--accent3);margin-right:8px}
+.log-line .ok{color:var(--good)}.log-line .er{color:var(--danger)}.log-line .inf{color:var(--accent)}
+
+/* ── Tooltip ── */
+#map-tooltip{position:fixed;pointer-events:none;background:var(--panel2);border:1px solid var(--accent);border-radius:6px;padding:10px 14px;font-family:var(--fm);font-size:11px;opacity:0;transition:opacity .2s;z-index:100}
+#map-tooltip.visible{opacity:1}
+#map-tooltip .tt-city{color:var(--accent);font-weight:700;font-size:12px;margin-bottom:4px}
+
+/* ══════════════════════════════════════════════
+   DATA & TRAIN TAB
+══════════════════════════════════════════════ */
+.data-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:48px 24px;text-align:center;cursor:pointer;transition:all .3s;position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(0,229,255,.04)}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.upload-icon{font-size:36px;margin-bottom:12px}
+.upload-title{font-size:16px;font-weight:600;margin-bottom:6px}
+.upload-sub{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1px}
+.upload-success{border-color:var(--good)!important;background:rgba(0,255,179,.04)!important}
+
+.col-mapper{display:flex;flex-direction:column;gap:10px}
+.col-mapper-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:6px}
+.col-mapper-label{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;min-width:100px}
+.col-mapper-select{flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:11px;padding:6px 10px;border-radius:4px}
+.col-mapper-badge{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:10px;letter-spacing:1px}
+.col-mapper-badge.target{background:rgba(255,75,110,.15);color:var(--accent2)}
+.col-mapper-badge.feature{background:rgba(0,229,255,.12);color:var(--accent)}
+
+.stat-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.stat-chip{font-family:var(--fm);font-size:9px;padding:3px 10px;border-radius:10px;border:1px solid var(--border);color:var(--muted)}
+
+/* Train config */
+.train-config{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.train-field{display:flex;flex-direction:column;gap:6px}
+.train-field label{font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+.train-field input{background:var(--panel2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:12px;padding:8px 12px;border-radius:4px;width:100%}
+.train-field input:focus{outline:none;border-color:var(--accent)}
+
+/* Progress */
+.progress-wrap{margin:16px 0}
+.progress-bar-bg{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.progress-bar{height:6px;background:linear-gradient(90deg,var(--accent3),var(--accent));border-radius:3px;transition:width .3s ease;width:0%}
+.progress-stats{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:6px}
+
+/* Loss chart */
+.loss-chart-wrap{height:200px;position:relative}
+
+/* Result banner */
+.result-banner{display:none;padding:20px 24px;border-radius:8px;border:1px solid var(--good);background:rgba(0,255,179,.06);margin-top:16px}
+.result-banner.visible{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.result-title{font-size:16px;font-weight:800;color:var(--good);margin-bottom:4px}
+.result-sub{font-family:var(--fm);font-size:11px;color:var(--muted)}
+.result-stats{display:flex;gap:24px}
+.result-stat{text-align:center}
+.result-stat .val{font-size:24px;font-weight:800;color:var(--accent)}
+.result-stat .lbl{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+
+/* Error banner */
+.error-banner{display:none;padding:14px 18px;border-radius:6px;border:1px solid var(--danger);background:rgba(255,75,110,.06);font-family:var(--fm);font-size:11px;color:var(--danger);margin-top:12px}
+.error-banner.visible{display:block}
+
+@media(max-width:900px){.main-grid,.data-grid{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div id="map-tooltip"><div class="tt-city" id="tt-city"></div><div id="tt-latency"></div><div id="tt-players" style="color:var(--muted)"></div></div>
+
+<div class="app">
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon"></div>
+    <div>
+      <div class="logo-text">Edge<span>AI</span> Monitor</div>
+      <div class="logo-sub">Gaming Latency Intelligence · APAC</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('dashboard')">Dashboard</button>
+      <button class="nav-tab" onclick="switchTab('data')">Data &amp; Train</button>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="server-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">DISCONNECTED</span>
+    </div>
+    <button class="btn btn-primary" id="btn-connect" onclick="toggleSim()">Connect</button>
+    <button class="btn btn-danger" id="btn-stop" onclick="stopSim()" style="display:none">Stop</button>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════
+     DASHBOARD PAGE
+══════════════════════════════════ -->
+<div class="page active" id="page-dashboard">
+  <!-- Config -->
+  <div class="config-row">
+    <label>SERVER URL</label>
+    <input type="text" id="server-url" value="http://localhost:5000/predict" style="width:260px;background:var(--panel2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:4px"/>
+    <label>PLAYERS</label><input type="number" id="num-players" value="6" min="1" max="12"/>
+    <label>INTERVAL (ms)</label><input type="number" id="interval-ms" value="1200" min="400" max="5000" step="100"/>
+    <label>SEQ LEN</label><input type="number" id="seq-len" value="10" min="3" max="30"/>
+    <label>JITTER</label>
+    <select id="jitter-mode">
+      <option value="normal">Normal</option>
+      <option value="high">High</option>
+      <option value="spike">Spike</option>
+    </select>
+    <!-- Model mode badge -->
+    <span id="model-badge" style="font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:10px;background:rgba(0,229,255,.1);color:var(--accent);border:1px solid rgba(0,229,255,.3);letter-spacing:1px">MODEL: DEFAULT</span>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi-card a1"><div class="kpi-label">Avg Predicted Latency</div><div class="kpi-value a1" id="kpi-avg">--</div><div class="kpi-unit">ms</div><div class="kpi-delta" id="kpi-avg-d"></div></div>
+    <div class="kpi-card a2"><div class="kpi-label">Peak Latency (live)</div><div class="kpi-value a2" id="kpi-peak">--</div><div class="kpi-unit">ms</div><div class="kpi-delta" id="kpi-peak-d"></div></div>
+    <div class="kpi-card a3"><div class="kpi-label">Total Predictions</div><div class="kpi-value a3" id="kpi-total">0</div><div class="kpi-unit">requests</div></div>
+    <div class="kpi-card a4"><div class="kpi-label">Server Response Time</div><div class="kpi-value a4" id="kpi-resp">--</div><div class="kpi-unit">ms</div></div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+    <!-- Chart -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>Live Latency — Predicted vs Actual</div>
+        <div style="display:flex;gap:16px;font-family:var(--fm);font-size:10px;color:var(--muted)">
+          <span style="color:var(--accent)">■ Predicted</span>
+          <span style="color:var(--accent2)">■ Actual</span>
+          <select id="player-filter" onchange="updateFilter()" style="background:var(--panel2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:10px;padding:2px 6px;border-radius:3px">
+            <option value="all">All Players</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="latency-chart"></canvas></div>
+    </div>
+    <!-- Heatmap -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>APAC Region Heatmap</div>
+        <span style="font-family:var(--fm);font-size:9px;color:var(--muted)">avg ms per node</span>
+      </div>
+      <svg viewBox="0 0 380 340" xmlns="http://www.w3.org/2000/svg" class="apac-map">
+        <rect width="380" height="340" fill="#080c14" rx="6"/>
+        <line x1="0" y1="85" x2="380" y2="85" stroke="#1e2d45" stroke-width="0.5"/>
+        <line x1="0" y1="170" x2="380" y2="170" stroke="#1e2d45" stroke-width="0.5"/>
+        <line x1="0" y1="255" x2="380" y2="255" stroke="#1e2d45" stroke-width="0.5"/>
+        <line x1="95" y1="0" x2="95" y2="340" stroke="#1e2d45" stroke-width="0.5"/>
+        <line x1="190" y1="0" x2="190" y2="340" stroke="#1e2d45" stroke-width="0.5"/>
+        <line x1="285" y1="0" x2="285" y2="340" stroke="#1e2d45" stroke-width="0.5"/>
+        <ellipse cx="110" cy="130" rx="28" ry="38" fill="#0d1420" stroke="#1e2d45" stroke-width="0.8"/>
+        <ellipse cx="195" cy="145" rx="18" ry="42" fill="#0d1420" stroke="#1e2d45" stroke-width="0.8"/>
+        <ellipse cx="240" cy="80" rx="55" ry="42" fill="#0d1420" stroke="#1e2d45" stroke-width="0.8"/>
+        <ellipse cx="315" cy="75" rx="10" ry="22" fill="#0d1420" stroke="#1e2d45" stroke-width="0.8" transform="rotate(-15,315,75)"/>
+        <ellipse cx="230" cy="210" rx="42" ry="20" fill="#0d1420" stroke="#1e2d45" stroke-width="0.8"/>
+        <ellipse cx="290" cy="270" rx="52" ry="42" fill="#0d1420" stroke="#1e2d45" stroke-width="0.8"/>
+        <g id="region-mumbai" class="region-bubble" onmouseenter="showTip(event,'mumbai')" onmouseleave="hideTip()">
+          <circle cx="105" cy="118" r="20" fill="rgba(0,229,255,.1)" stroke="rgba(0,229,255,.3)" stroke-width="1"/>
+          <circle id="bub-mumbai" cx="105" cy="118" r="12" fill="#00e5ff" opacity="0.7"/>
+          <text x="105" y="147" text-anchor="middle" fill="#4a5f7a" font-size="9" font-family="'Space Mono',monospace">Mumbai</text>
+          <text id="val-mumbai" x="105" y="123" text-anchor="middle" fill="#080c14" font-size="8" font-family="'Space Mono',monospace" font-weight="700">--</text>
+        </g>
+        <g id="region-singapore" class="region-bubble" onmouseenter="showTip(event,'singapore')" onmouseleave="hideTip()">
+          <circle cx="200" cy="195" r="20" fill="rgba(0,229,255,.1)" stroke="rgba(0,229,255,.3)" stroke-width="1"/>
+          <circle id="bub-singapore" cx="200" cy="195" r="12" fill="#00e5ff" opacity="0.7"/>
+          <text x="200" y="222" text-anchor="middle" fill="#4a5f7a" font-size="9" font-family="'Space Mono',monospace">Singapore</text>
+          <text id="val-singapore" x="200" y="200" text-anchor="middle" fill="#080c14" font-size="8" font-family="'Space Mono',monospace" font-weight="700">--</text>
+        </g>
+        <g id="region-tokyo" class="region-bubble" onmouseenter="showTip(event,'tokyo')" onmouseleave="hideTip()">
+          <circle cx="320" cy="70" r="20" fill="rgba(0,229,255,.1)" stroke="rgba(0,229,255,.3)" stroke-width="1"/>
+          <circle id="bub-tokyo" cx="320" cy="70" r="12" fill="#00e5ff" opacity="0.7"/>
+          <text x="320" y="99" text-anchor="middle" fill="#4a5f7a" font-size="9" font-family="'Space Mono',monospace">Tokyo</text>
+          <text id="val-tokyo" x="320" y="75" text-anchor="middle" fill="#080c14" font-size="8" font-family="'Space Mono',monospace" font-weight="700">--</text>
+        </g>
+        <g id="region-sydney" class="region-bubble" onmouseenter="showTip(event,'sydney')" onmouseleave="hideTip()">
+          <circle cx="310" cy="268" r="20" fill="rgba(0,229,255,.1)" stroke="rgba(0,229,255,.3)" stroke-width="1"/>
+          <circle id="bub-sydney" cx="310" cy="268" r="12" fill="#00e5ff" opacity="0.7"/>
+          <text x="310" y="297" text-anchor="middle" fill="#4a5f7a" font-size="9" font-family="'Space Mono',monospace">Sydney</text>
+          <text id="val-sydney" x="310" y="273" text-anchor="middle" fill="#080c14" font-size="8" font-family="'Space Mono',monospace" font-weight="700">--</text>
+        </g>
+        <g id="region-seoul" class="region-bubble" onmouseenter="showTip(event,'seoul')" onmouseleave="hideTip()">
+          <circle cx="275" cy="75" r="20" fill="rgba(0,229,255,.1)" stroke="rgba(0,229,255,.3)" stroke-width="1"/>
+          <circle id="bub-seoul" cx="275" cy="75" r="12" fill="#00e5ff" opacity="0.7"/>
+          <text x="275" y="104" text-anchor="middle" fill="#4a5f7a" font-size="9" font-family="'Space Mono',monospace">Seoul</text>
+          <text id="val-seoul" x="275" y="80" text-anchor="middle" fill="#080c14" font-size="8" font-family="'Space Mono',monospace" font-weight="700">--</text>
+        </g>
+        <g id="region-jakarta" class="region-bubble" onmouseenter="showTip(event,'jakarta')" onmouseleave="hideTip()">
+          <circle cx="210" cy="235" r="20" fill="rgba(0,229,255,.1)" stroke="rgba(0,229,255,.3)" stroke-width="1"/>
+          <circle id="bub-jakarta" cx="210" cy="235" r="12" fill="#00e5ff" opacity="0.7"/>
+          <text x="210" y="263" text-anchor="middle" fill="#4a5f7a" font-size="9" font-family="'Space Mono',monospace">Jakarta</text>
+          <text id="val-jakarta" x="210" y="240" text-anchor="middle" fill="#080c14" font-size="8" font-family="'Space Mono',monospace" font-weight="700">--</text>
+        </g>
+        <rect x="8" y="298" width="180" height="30" fill="rgba(13,20,32,.9)" rx="4"/>
+        <text x="14" y="310" fill="#4a5f7a" font-size="8" font-family="'Space Mono',monospace">LOW</text>
+        <defs><linearGradient id="legGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00e5ff"/><stop offset="50%" stop-color="#ffcc00"/><stop offset="100%" stop-color="#ff4b6e"/></linearGradient></defs>
+        <rect x="30" y="304" width="120" height="8" rx="4" fill="url(#legGrad)"/>
+        <text x="156" y="310" fill="#4a5f7a" font-size="8" font-family="'Space Mono',monospace">HIGH</text>
+        <text x="90" y="324" text-anchor="middle" fill="#4a5f7a" font-size="7" font-family="'Space Mono',monospace">latency (ms)</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Player Table -->
+  <div class="panel" style="margin-bottom:16px">
+    <div class="panel-header">
+      <div class="panel-title">Player Sessions</div>
+      <span style="font-family:var(--fm);font-size:9px;color:var(--muted)" id="player-count">0 active</span>
+    </div>
+    <table class="player-table">
+      <thead><tr><th>Player</th><th>Region</th><th>Predicted</th><th>Actual</th><th>Latency Bar</th><th>FPS</th><th>Status</th><th>Requests</th></tr></thead>
+      <tbody id="player-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Log -->
+  <div class="log-panel">
+    <div class="panel-header" style="margin-bottom:8px">
+      <div class="panel-title">Console Log</div>
+      <button onclick="clearLog()" class="btn btn-ghost" style="font-size:9px;padding:3px 8px">CLEAR</button>
+    </div>
+    <div class="log-scroll" id="log-scroll"></div>
+  </div>
+</div><!-- /dashboard page -->
+
+<!-- ══════════════════════════════════
+     DATA & TRAIN PAGE
+══════════════════════════════════ -->
+<div class="page" id="page-data">
+
+  <!-- Step indicator -->
+  <div style="display:flex;align-items:center;gap:0;margin-bottom:24px">
+    <div class="step-item" id="step1-ind" style="display:flex;align-items:center;gap:8px;font-family:var(--fm);font-size:10px;letter-spacing:1px">
+      <div style="width:28px;height:28px;border-radius:50%;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);font-size:12px">1</div>
+      <span style="color:var(--accent)">UPLOAD</span>
+    </div>
+    <div style="flex:1;height:1px;background:var(--border);margin:0 12px"></div>
+    <div class="step-item" id="step2-ind" style="display:flex;align-items:center;gap:8px;font-family:var(--fm);font-size:10px;letter-spacing:1px">
+      <div id="step2-circle" style="width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted);font-size:12px">2</div>
+      <span id="step2-label" style="color:var(--muted)">MAP COLUMNS</span>
+    </div>
+    <div style="flex:1;height:1px;background:var(--border);margin:0 12px"></div>
+    <div class="step-item" id="step3-ind" style="display:flex;align-items:center;gap:8px;font-family:var(--fm);font-size:10px;letter-spacing:1px">
+      <div id="step3-circle" style="width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted);font-size:12px">3</div>
+      <span id="step3-label" style="color:var(--muted)">RETRAIN</span>
+    </div>
+    <div style="flex:1;height:1px;background:var(--border);margin:0 12px"></div>
+    <div class="step-item" style="display:flex;align-items:center;gap:8px;font-family:var(--fm);font-size:10px;letter-spacing:1px">
+      <div id="step4-circle" style="width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted);font-size:12px">4</div>
+      <span id="step4-label" style="color:var(--muted)">PREDICT</span>
+    </div>
+  </div>
+
+  <div class="data-grid">
+    <!-- Upload -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Step 1 — Upload Dataset</div>
+        <span style="font-family:var(--fm);font-size:9px;color:var(--muted)">CSV only</span>
+      </div>
+      <div class="upload-zone" id="upload-zone" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFile(event)">
+        <input type="file" id="csv-file" accept=".csv" onchange="handleFile(event)"/>
+        <div class="upload-icon">📂</div>
+        <div class="upload-title" id="upload-title">Drop your CSV here</div>
+        <div class="upload-sub" id="upload-sub">or click to browse · Kaggle datasets work great</div>
+      </div>
+      <div id="file-stats" style="display:none;margin-top:14px">
+        <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px">DATASET OVERVIEW</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="file-stats-inner"></div>
+      </div>
+    </div>
+
+    <!-- Column Mapper -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Step 2 — Map Columns</div>
+        <span style="font-family:var(--fm);font-size:9px;color:var(--muted)">Tell the model what each column means</span>
+      </div>
+      <div id="mapper-placeholder" style="text-align:center;padding:40px 20px;color:var(--muted);font-family:var(--fm);font-size:11px">
+        Upload a CSV first to see column options
+      </div>
+      <div id="mapper-content" style="display:none">
+        <div class="col-mapper" id="col-mapper-rows"></div>
+        <div class="stat-chips" id="col-stats-chips"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Train Config + Progress -->
+  <div class="panel" style="margin-bottom:16px">
+    <div class="panel-header">
+      <div class="panel-title">Step 3 — Retrain Model</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" id="btn-retrain" onclick="startRetrain()" disabled>Start Retraining</button>
+      </div>
+    </div>
+
+    <div class="train-config">
+      <div class="train-field"><label>Epochs</label><input type="number" id="train-epochs" value="50" min="10" max="200"/></div>
+      <div class="train-field"><label>Sequence Length</label><input type="number" id="train-seqlen" value="10" min="3" max="30"/></div>
+      <div class="train-field"><label>Learning Rate</label><input type="number" id="train-lr" value="0.001" step="0.0001" min="0.0001"/></div>
+    </div>
+
+    <div id="train-progress-section" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-family:var(--fm);font-size:10px;color:var(--muted)" id="progress-label">Epoch 0 / 50</span>
+        <span style="font-family:var(--fm);font-size:10px;color:var(--accent)" id="progress-loss">Loss: --</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar"></div></div>
+        <div class="progress-stats">
+          <span id="prog-epoch">0 / 0 epochs</span>
+          <span id="prog-best">Best loss: --</span>
+        </div>
+      </div>
+      <div class="loss-chart-wrap" style="margin-top:16px">
+        <canvas id="loss-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="error-banner" id="train-error"></div>
+
+    <!-- Result banner -->
+    <div class="result-banner" id="result-banner">
+      <div>
+        <div class="result-title">✅ Retraining Complete!</div>
+        <div class="result-sub" id="result-sub">Model updated with your dataset</div>
+      </div>
+      <div class="result-stats">
+        <div class="result-stat"><div class="val" id="result-r2">--</div><div class="lbl">R² Score</div></div>
+        <div class="result-stat"><div class="val" id="result-epochs">--</div><div class="lbl">Epochs</div></div>
+        <div class="result-stat"><div class="val" id="result-loss">--</div><div class="lbl">Final Loss</div></div>
+      </div>
+      <button class="btn btn-success" onclick="goToDashboard()">Go to Dashboard →</button>
+    </div>
+  </div>
+
+  <!-- Recommended datasets -->
+  <div class="panel">
+    <div class="panel-header"><div class="panel-title">Recommended Kaggle Datasets</div></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div style="padding:14px;background:var(--panel2);border:1px solid var(--border);border-radius:6px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">Online Gaming Behavior</div>
+        <div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:10px;line-height:1.6">Latency, FPS, session data. Best overall match for this model.</div>
+        <a href="https://www.kaggle.com/datasets/rabieelkharoua/predict-online-gaming-behavior-dataset" target="_blank" style="font-family:var(--fm);font-size:9px;color:var(--accent);text-decoration:none;letter-spacing:1px">VIEW ON KAGGLE →</a>
+      </div>
+      <div style="padding:14px;background:var(--panel2);border:1px solid var(--border);border-radius:6px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">Network Traffic Dataset</div>
+        <div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:10px;line-height:1.6">Bandwidth, packet loss, RTT metrics. Good for network-focused training.</div>
+        <a href="https://www.kaggle.com/datasets/jsrojas/ip-network-traffic-flows-labeled-with-87-apps" target="_blank" style="font-family:var(--fm);font-size:9px;color:var(--accent);text-decoration:none;letter-spacing:1px">VIEW ON KAGGLE →</a>
+      </div>
+      <div style="padding:14px;background:var(--panel2);border:1px solid var(--border);border-radius:6px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">Game Performance Metrics</div>
+        <div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:10px;line-height:1.6">FPS, CPU/GPU usage, frame time. Useful for multi-feature training.</div>
+        <a href="https://www.kaggle.com/datasets/nayanack/online-game-dataset" target="_blank" style="font-family:var(--fm);font-size:9px;color:var(--accent);text-decoration:none;letter-spacing:1px">VIEW ON KAGGLE →</a>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /data page -->
+</div><!-- /app -->
+
+<script>
+// ══════════════════════════════════════════════
+//  NAV
+// ══════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+function goToDashboard() {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-dashboard').classList.add('active');
+  document.querySelectorAll('.nav-tab')[0].classList.add('active');
+  addLog('<span class="inf">★</span> Model retrained on real data — predictions now use new weights', 'inf');
+  document.getElementById('model-badge').textContent = 'MODEL: RETRAINED ✓';
+  document.getElementById('model-badge').style.background = 'rgba(0,255,179,.1)';
+  document.getElementById('model-badge').style.color = 'var(--good)';
+  document.getElementById('model-badge').style.borderColor = 'rgba(0,255,179,.3)';
+}
+
+// ══════════════════════════════════════════════
+//  DASHBOARD LOGIC
+// ══════════════════════════════════════════════
+const MAX_PTS = 40;
+let running = false, intervalHandle = null, totalPredictions = 0;
+let prevAvg = null, prevPeak = null, filterPlayer = 'all';
+let players = [];
+const REGIONS = ['Mumbai','Singapore','Tokyo','Sydney','Seoul','Jakarta'];
+const REGION_MAP = {Mumbai:'mumbai',Singapore:'singapore',Tokyo:'tokyo',Sydney:'sydney',Seoul:'seoul',Jakarta:'jakarta'};
+const regionLatencies = {mumbai:[],singapore:[],tokyo:[],sydney:[],seoul:[],jakarta:[]};
+const COLORS = ['#00e5ff','#ff4b6e','#a259ff','#00ffb3','#ffcc00','#ff8c42','#3dffa0','#e040fb','#40c4ff','#f06292','#b9f6ca','#ffe57f'];
+const chartLabels = [];
+
+const ctx = document.getElementById('latency-chart').getContext('2d');
+const latencyChart = new Chart(ctx, {
+  type:'line', data:{labels:chartLabels,datasets:[]},
+  options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#111827',borderColor:'#1e2d45',borderWidth:1,
+      titleFont:{family:"'Space Mono',monospace",size:10},bodyFont:{family:"'Space Mono',monospace",size:10},
+      callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y?.toFixed(1)} ms`}}},
+    scales:{x:{ticks:{color:'#4a5f7a',font:{family:"'Space Mono',monospace",size:8},maxTicksLimit:8},grid:{color:'#1e2d45'}},
+            y:{ticks:{color:'#4a5f7a',font:{family:"'Space Mono',monospace",size:9},callback:v=>v+'ms'},grid:{color:'#1e2d45'},min:0}}}
+});
+
+function initPlayers(n) {
+  players = [];
+  const sel = document.getElementById('player-filter');
+  sel.innerHTML = '<option value="all">All Players</option>';
+  for (let i=0;i<n;i++) {
+    const id = `P${String(i+1).padStart(2,'0')}`;
+    const region = REGIONS[i % REGIONS.length];
+    players.push({id,region,reqCount:0,baseLat:20+Math.random()*80,baseFps:80+Math.random()*60,predictedLatency:null,actualLatency:null});
+    sel.innerHTML += `<option value="${id}">${id} — ${region}</option>`;
+  }
+  document.getElementById('player-count').textContent = `${n} active`;
+  rebuildDatasets();
+  renderTable();
+}
+
+function rebuildDatasets() {
+  latencyChart.data.datasets = [];
+  players.forEach((p,i) => {
+    const c = COLORS[i%COLORS.length];
+    latencyChart.data.datasets.push({label:`${p.id} pred`,data:[],borderColor:c,backgroundColor:c+'22',borderWidth:1.5,pointRadius:2,tension:.4,hidden:filterPlayer!=='all'&&filterPlayer!==p.id});
+    latencyChart.data.datasets.push({label:`${p.id} actual`,data:[],borderColor:c,backgroundColor:'transparent',borderWidth:1,borderDash:[4,3],pointRadius:0,tension:.4,hidden:filterPlayer!=='all'&&filterPlayer!==p.id});
+  });
+  latencyChart.update('none');
+}
+
+function generateMetrics(player) {
+  const jitter = document.getElementById('jitter-mode').value;
+  const seqLen = parseInt(document.getElementById('seq-len').value)||10;
+  const metrics = [];
+  for (let i=0;i<seqLen;i++) {
+    let lat = player.baseLat + (Math.random()-.5)*20;
+    if (jitter==='high') lat += (Math.random()-.5)*40;
+    if (jitter==='spike' && Math.random()<.15) lat += 80+Math.random()*60;
+    const fps = player.baseFps + (Math.random()-.5)*15;
+    metrics.push([Math.max(5,lat),Math.max(10,fps)]);
+  }
+  return metrics;
+}
+
+async function tick() {
+  const url = document.getElementById('server-url').value;
+  const ts = new Date().toLocaleTimeString('en-GB',{hour12:false});
+  chartLabels.push(ts);
+  if (chartLabels.length > MAX_PTS) chartLabels.shift();
+  const allPred = [];
+  const promises = players.map(async (player,i) => {
+    const metrics = generateMetrics(player);
+    const actual = metrics[metrics.length-1][0];
+    const t0 = performance.now();
+    let predicted = null;
+    try {
+      const resp = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({metrics})});
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      predicted = data.predicted_latency;
+      const elapsed = (performance.now()-t0).toFixed(0);
+      setStatus(true,elapsed);
+      addLog(`<span class="ok">✓</span> ${player.id} [${player.region}] pred=${predicted.toFixed(1)}ms actual=${actual.toFixed(1)}ms resp=${elapsed}ms`);
+    } catch(e) {
+      predicted = actual*(0.88+Math.random()*.24);
+      addLog(`<span class="er">✗</span> ${player.id} mock — ${e.message.slice(0,40)}`);
+      setStatus(false);
+    }
+    player.predictedLatency = predicted; player.actualLatency = actual; player.reqCount++;
+    allPred.push(predicted);
+    const pDs = latencyChart.data.datasets[i*2], aDs = latencyChart.data.datasets[i*2+1];
+    pDs.data.push(parseFloat(predicted.toFixed(2))); aDs.data.push(parseFloat(actual.toFixed(2)));
+    if (pDs.data.length > MAX_PTS) { pDs.data.shift(); aDs.data.shift(); }
+    const rk = REGION_MAP[player.region];
+    if (rk) { regionLatencies[rk].push(predicted); if (regionLatencies[rk].length>20) regionLatencies[rk].shift(); }
+  });
+  await Promise.allSettled(promises);
+  totalPredictions += players.length;
+  latencyChart.update();
+  updateKPIs(allPred);
+  updateHeatmap();
+  renderTable();
+}
+
+function updateKPIs(preds) {
+  if (!preds.length) return;
+  const avg = preds.reduce((a,b)=>a+b,0)/preds.length;
+  const peak = Math.max(...preds);
+  document.getElementById('kpi-avg').textContent = avg.toFixed(1);
+  document.getElementById('kpi-peak').textContent = peak.toFixed(1);
+  document.getElementById('kpi-total').textContent = totalPredictions;
+  if (prevAvg!==null){const d=avg-prevAvg,el=document.getElementById('kpi-avg-d');el.textContent=(d>0?'▲ +':'▼ ')+Math.abs(d).toFixed(1)+' ms';el.className='kpi-delta '+(d>0?'up':'down')}
+  if (prevPeak!==null){const d=peak-prevPeak,el=document.getElementById('kpi-peak-d');el.textContent=(d>0?'▲ +':'▼ ')+Math.abs(d).toFixed(1)+' ms';el.className='kpi-delta '+(d>0?'up':'down')}
+  prevAvg=avg; prevPeak=peak;
+}
+
+function updateHeatmap() {
+  Object.entries(REGION_MAP).forEach(([name,key]) => {
+    const arr = regionLatencies[key]; if (!arr.length) return;
+    const avg = arr.reduce((a,b)=>a+b,0)/arr.length;
+    const bub = document.getElementById('bub-'+key), val = document.getElementById('val-'+key);
+    if (!bub||!val) return;
+    bub.setAttribute('r', Math.max(8,Math.min(22,8+(avg/200)*14)));
+    bub.setAttribute('fill', avg<50?'#00e5ff':avg<100?'#00ffb3':avg<150?'#ffcc00':'#ff4b6e');
+    val.textContent = Math.round(avg)+'ms';
+  });
+}
+
+function renderTable() {
+  document.getElementById('player-tbody').innerHTML = players.map((p,i) => {
+    const pred=p.predictedLatency, act=p.actualLatency;
+    const c=COLORS[i%COLORS.length];
+    const barPct=pred!==null?Math.min(100,(pred/200)*100):0;
+    const barColor=pred===null?'#1e2d45':pred<50?'#00e5ff':pred<100?'#00ffb3':pred<150?'#ffcc00':'#ff4b6e';
+    const tag=pred===null?'':pred<60?'<span class="tag good">GOOD</span>':pred<120?'<span class="tag warn">FAIR</span>':'<span class="tag bad">HIGH</span>';
+    return `<tr>
+      <td><span class="player-badge" style="border-color:${c};color:${c}">${p.id}</span></td>
+      <td style="color:var(--muted)">${p.region}</td>
+      <td style="color:${c};font-weight:700">${pred!==null?pred.toFixed(1)+'ms':'--'}</td>
+      <td style="color:var(--muted)">${act!==null?act.toFixed(1)+'ms':'--'}</td>
+      <td><div class="latency-bar-bg"><div class="latency-bar" style="width:${barPct}%;background:${barColor}"></div></div></td>
+      <td style="color:var(--muted)">${p.baseFps.toFixed(0)}</td>
+      <td>${tag}</td>
+      <td style="color:var(--muted)">${p.reqCount}</td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleSim(){if(!running)startSim()}
+function startSim(){
+  const n=Math.min(12,Math.max(1,parseInt(document.getElementById('num-players').value)||6));
+  const ms=Math.max(400,parseInt(document.getElementById('interval-ms').value)||1200);
+  initPlayers(n); running=true;
+  document.getElementById('btn-connect').disabled=true;
+  document.getElementById('btn-stop').style.display='inline-block';
+  addLog(`<span class="inf">►</span> Started — ${n} players @ ${ms}ms`);
+  tick(); intervalHandle=setInterval(tick,ms);
+}
+function stopSim(){
+  running=false; clearInterval(intervalHandle);
+  document.getElementById('btn-connect').disabled=false;
+  document.getElementById('btn-stop').style.display='none';
+  setStatus(false); addLog('<span class="er">■</span> Stopped');
+}
+function setStatus(online,ms){
+  const dot=document.getElementById('status-dot'),txt=document.getElementById('status-text');
+  if(online){dot.className='status-dot online';txt.style.color='var(--good)';txt.textContent=`LIVE · ${ms}ms`;if(ms)document.getElementById('kpi-resp').textContent=ms}
+  else{dot.className='status-dot error';txt.style.color='var(--danger)';txt.textContent='MOCK MODE'}
+}
+function updateFilter(){
+  filterPlayer=document.getElementById('player-filter').value;
+  latencyChart.data.datasets.forEach((ds,i)=>{const pid=players[Math.floor(i/2)]?.id;ds.hidden=filterPlayer!=='all'&&pid!==filterPlayer});
+  latencyChart.update();
+}
+function addLog(msg){
+  const el=document.getElementById('log-scroll');
+  const ts=new Date().toLocaleTimeString('en-GB',{hour12:false});
+  el.innerHTML+=`<div class="log-line"><span class="ts">[${ts}]</span>${msg}</div>`;
+  el.scrollTop=el.scrollHeight;
+  if(el.children.length>120)el.removeChild(el.firstChild);
+}
+function clearLog(){document.getElementById('log-scroll').innerHTML=''}
+
+// Heatmap tooltip
+const RM2={'mumbai':'Mumbai','singapore':'Singapore','tokyo':'Tokyo','sydney':'Sydney','seoul':'Seoul','jakarta':'Jakarta'};
+function showTip(e,key){
+  const arr=regionLatencies[key],avg=arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1):'--';
+  const count=players.filter(p=>REGION_MAP[p.region]===key).length;
+  document.getElementById('tt-city').textContent=RM2[key];
+  document.getElementById('tt-latency').textContent=`Avg latency: ${avg} ms`;
+  document.getElementById('tt-players').textContent=`${count} player(s) on node`;
+  const tt=document.getElementById('map-tooltip');
+  tt.style.left=(e.clientX+14)+'px'; tt.style.top=(e.clientY-10)+'px'; tt.classList.add('visible');
+}
+function hideTip(){document.getElementById('map-tooltip').classList.remove('visible')}
+
+// ══════════════════════════════════════════════
+//  DATA & TRAIN LOGIC
+// ══════════════════════════════════════════════
+let uploadedColumns = [];
+let lossChart = null;
+const lossData = [];
+const BASE_URL = () => document.getElementById('server-url').value.replace('/predict','');
+
+function dragOver(e){e.preventDefault();document.getElementById('upload-zone').classList.add('drag')}
+function dragLeave(){document.getElementById('upload-zone').classList.remove('drag')}
+function dropFile(e){e.preventDefault();dragLeave();const f=e.dataTransfer.files[0];if(f)uploadCSV(f)}
+function handleFile(e){const f=e.target.files[0];if(f)uploadCSV(f)}
+
+async function uploadCSV(file) {
+  const zone = document.getElementById('upload-zone');
+  document.getElementById('upload-title').textContent = '⏳ Uploading...';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const resp = await fetch(BASE_URL()+'/upload-data',{method:'POST',body:fd});
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    uploadedColumns = data.columns;
+    zone.classList.add('upload-success');
+    document.getElementById('upload-title').textContent = '✅ '+file.name;
+    document.getElementById('upload-sub').textContent = `${data.rows.toLocaleString()} rows · ${data.columns.length} columns`;
+    // File stats
+    document.getElementById('file-stats').style.display='block';
+    document.getElementById('file-stats-inner').innerHTML = [
+      {l:'Rows',v:data.rows.toLocaleString()},
+      {l:'Columns',v:data.columns.length},
+      {l:'Numeric cols',v:data.columns.filter(c=>c.dtype.includes('float')||c.dtype.includes('int')).length},
+      {l:'File',v:file.name.slice(0,18)},
+    ].map(s=>`<div style="background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:8px 12px"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:2px">${s.l}</div><div style="font-family:var(--fm);font-size:13px;font-weight:700;color:var(--text)">${s.v}</div></div>`).join('');
+    buildMapper(data.columns);
+    activateStep(2);
+  } catch(e) {
+    document.getElementById('upload-title').textContent = '❌ Upload failed';
+    document.getElementById('upload-sub').textContent = e.message;
+  }
+}
+
+function buildMapper(cols) {
+  const numericCols = cols.filter(c=>c.dtype.includes('float')||c.dtype.includes('int')||c.dtype.includes('64'));
+  const opts = numericCols.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  const allOpts = cols.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+
+  // Auto-detect likely columns
+  const findCol = (...hints) => numericCols.find(c=>hints.some(h=>c.name.toLowerCase().includes(h)))?.name || numericCols[0]?.name;
+  const latCol = findCol('latency','ping','rtt','delay');
+  const bwCol  = findCol('bandwidth','bw','throughput','speed','download');
+  const plCol  = findCol('packet','loss','drop');
+
+  document.getElementById('mapper-placeholder').style.display='none';
+  document.getElementById('mapper-content').style.display='block';
+  document.getElementById('col-mapper-rows').innerHTML = `
+    <div class="col-mapper-row">
+      <span class="col-mapper-label">Latency (target)</span>
+      <select class="col-mapper-select" id="map-latency">${opts}</select>
+      <span class="col-mapper-badge target">TARGET</span>
+    </div>
+    <div class="col-mapper-row">
+      <span class="col-mapper-label">Bandwidth</span>
+      <select class="col-mapper-select" id="map-bandwidth"><option value="">— none —</option>${opts}</select>
+      <span class="col-mapper-badge feature">FEATURE</span>
+    </div>
+    <div class="col-mapper-row">
+      <span class="col-mapper-label">Packet Loss</span>
+      <select class="col-mapper-select" id="map-packetloss"><option value="">— none —</option>${opts}</select>
+      <span class="col-mapper-badge feature">FEATURE</span>
+    </div>
+    <div class="col-mapper-row">
+      <span class="col-mapper-label">Extra Feature</span>
+      <select class="col-mapper-select" id="map-extra"><option value="">— none —</option>${allOpts}</select>
+      <span class="col-mapper-badge feature">OPTIONAL</span>
+    </div>`;
+
+  // Auto-select detected columns
+  if (latCol) document.getElementById('map-latency').value = latCol;
+  if (bwCol)  document.getElementById('map-bandwidth').value = bwCol;
+  if (plCol)  document.getElementById('map-packetloss').value = plCol;
+
+  // Show column stats chips
+  document.getElementById('col-stats-chips').innerHTML = numericCols.slice(0,8).map(c=>
+    `<div class="stat-chip">${c.name} · min=${c.min} max=${c.max}</div>`
+  ).join('');
+
+  document.getElementById('btn-retrain').disabled = false;
+  activateStep(3);
+}
+
+// ── Loss chart ──
+function initLossChart() {
+  if (lossChart) { lossChart.destroy(); lossChart=null; }
+  lossData.length = 0;
+  const lc = document.getElementById('loss-chart').getContext('2d');
+  lossChart = new Chart(lc,{
+    type:'line',
+    data:{labels:[],datasets:[{label:'Training Loss',data:[],borderColor:'#a259ff',backgroundColor:'rgba(162,89,255,.1)',borderWidth:2,pointRadius:0,tension:.4,fill:true}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#111827',bodyFont:{family:"'Space Mono',monospace",size:10}}},
+      scales:{x:{ticks:{color:'#4a5f7a',font:{family:"'Space Mono',monospace",size:8},maxTicksLimit:10},grid:{color:'#1e2d45'}},
+              y:{ticks:{color:'#4a5f7a',font:{family:"'Space Mono',monospace",size:9}},grid:{color:'#1e2d45'}}}}
+  });
+}
+
+// ── Retrain ──
+let sseSource = null;
+async function startRetrain() {
+  const targetCol = document.getElementById('map-latency')?.value;
+  if (!targetCol) { alert('Select a target column first'); return; }
+
+  const featureCols = ['map-bandwidth','map-packetloss','map-extra']
+    .map(id=>document.getElementById(id)?.value).filter(v=>v&&v!=='');
+
+  const epochs  = parseInt(document.getElementById('train-epochs').value)||50;
+  const seqLen  = parseInt(document.getElementById('train-seqlen').value)||10;
+  const lr      = parseFloat(document.getElementById('train-lr').value)||0.001;
+
+  document.getElementById('train-progress-section').style.display='block';
+  document.getElementById('result-banner').classList.remove('visible');
+  document.getElementById('train-error').classList.remove('visible');
+  document.getElementById('btn-retrain').disabled=true;
+  initLossChart();
+
+  try {
+    const resp = await fetch(BASE_URL()+'/retrain',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({target_col:targetCol,feature_cols:featureCols,epochs,seq_len:seqLen,lr})
+    });
+    const d = await resp.json();
+    if (d.error) throw new Error(d.error);
+  } catch(e) {
+    showTrainError(e.message); return;
+  }
+
+  // Poll progress every 200ms (SSE fallback for file:// protocol)
+  const pollInterval = setInterval(async () => {
+    try {
+      const r = await fetch(BASE_URL()+'/train-progress');
+      const p = await r.json();
+      updateProgress(p);
+      if (p.done || p.error) {
+        clearInterval(pollInterval);
+        if (p.error) showTrainError(p.error);
+        else showResult(p);
+        document.getElementById('btn-retrain').disabled=false;
+      }
+    } catch(e) { clearInterval(pollInterval); showTrainError(e.message); }
+  }, 250);
+}
+
+function updateProgress(p) {
+  const pct = p.total_epochs ? (p.epoch/p.total_epochs)*100 : 0;
+  document.getElementById('progress-bar').style.width = pct+'%';
+  document.getElementById('progress-label').textContent = `Epoch ${p.epoch} / ${p.total_epochs}`;
+  document.getElementById('progress-loss').textContent = `Loss: ${p.loss ?? '--'}`;
+  document.getElementById('prog-epoch').textContent = `${p.epoch} / ${p.total_epochs} epochs`;
+  document.getElementById('prog-best').textContent = `Best loss: ${p.best_loss ?? '--'}`;
+  if (p.loss !== null && lossChart) {
+    lossChart.data.labels.push(p.epoch);
+    lossChart.data.datasets[0].data.push(p.loss);
+    lossChart.update('none');
+  }
+}
+
+function showResult(p) {
+  activateStep(4);
+  const banner = document.getElementById('result-banner');
+  banner.classList.add('visible');
+  document.getElementById('result-r2').textContent = (p.accuracy??'--')+'%';
+  document.getElementById('result-epochs').textContent = p.epoch;
+  document.getElementById('result-loss').textContent = p.best_loss??'--';
+  document.getElementById('result-sub').textContent = `Trained on your dataset · input_size updated · model saved to models/lag_model.pth`;
+}
+
+function showTrainError(msg) {
+  const el = document.getElementById('train-error');
+  el.textContent = '❌ '+msg; el.classList.add('visible');
+}
+
+function activateStep(n) {
+  [2,3,4].forEach(i => {
+    const circle = document.getElementById(`step${i}-circle`);
+    const label  = document.getElementById(`step${i}-label`);
+    if (!circle) return;
+    if (i <= n) {
+      circle.style.borderColor='var(--accent)'; circle.style.color='var(--accent)';
+      label.style.color='var(--accent)';
+    }
+  });
+}
+
+addLog('<span class="inf">●</span> Dashboard ready. Click Connect to start.');
+</script>
+</body>
+</html>
